@@ -148,6 +148,29 @@ def admin_bookings():
         return render_template('admin_bookings.html', bookings=bookings)
     return redirect(url_for('login'))
 
+# --- MISSING APPROVAL ROUTES ---
+
+@app.route('/approve_booking/<int:id>')
+def approve_booking(id):
+    if 'role' in session and session['role'] == 'admin':
+        cursor = mysql.connection.cursor()
+        cursor.execute("UPDATE bookings SET status = 'approved' WHERE id = %s", (id,))
+        mysql.connection.commit()
+        # Redirect back to the bookings list
+        return redirect(url_for('admin_bookings'))
+    return redirect(url_for('login'))
+
+@app.route('/reject_booking/<int:id>')
+def reject_booking(id):
+    if 'role' in session and session['role'] == 'admin':
+        cursor = mysql.connection.cursor()
+        cursor.execute("UPDATE bookings SET status = 'rejected' WHERE id = %s", (id,))
+        mysql.connection.commit()
+        # Redirect back to the bookings list
+        return redirect(url_for('admin_bookings'))
+    return redirect(url_for('login'))
+
+
 # 3. MANAGE USERS PAGE
 @app.route('/admin/users', methods=['GET', 'POST'])
 def manage_users():
