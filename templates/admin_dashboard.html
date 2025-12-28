@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10 text-center mb-5">
+        <h2>Admin Dashboard</h2>
+        <p class="text-muted">Select a module to manage.</p>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-3 mb-4">
+        <div class="card shadow h-100 text-center border-0 hover-effect">
+            <div class="card-body py-5">
+                <div class="display-4 text-primary mb-3">🏢</div>
+                <h4 class="card-title">Facilities</h4>
+                <p class="text-muted small">Add, Edit, or Delete rooms and venues.</p>
+                <a href="{{ url_for('manage_facilities') }}" class="btn btn-primary stretched-link">Manage Facilities</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card shadow h-100 text-center border-0 hover-effect">
+            <div class="card-body py-5">
+                <div class="display-4 text-success mb-3">📅</div>
+                <h4 class="card-title">Approvals</h4>
+                <p class="text-muted small">Approve or Decline reservation requests.</p>
+                <a href="{{ url_for('admin_bookings') }}" class="btn btn-success stretched-link">View Requests</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card shadow h-100 text-center border-0 hover-effect">
+            <div class="card-body py-5">
+                <div class="display-4 text-warning mb-3">👥</div>
+                <h4 class="card-title">Accounts</h4>
+                <p class="text-muted small">Manage faculty accounts and passwords.</p>
+                <a href="{{ url_for('manage_users') }}" class="btn btn-warning text-dark stretched-link">Manage Users</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h4>Welcome, {{ session.name }}!</h4>
+        
+        <a href="{{ url_for('faculty_booking') }}" class="btn btn-success btn-sm">+ New Booking</a>
+    </div>
+    <div class="card-body">
+        {% if bookings %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Facility</th>
+                        <th>Schedule</th>
+                        <th>Purpose</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for booking in bookings %}
+                    <tr>
+                        <td class="fw-bold">{{ booking.facility_name }}</td>
+                        <td>
+                            <small class="text-muted">Start:</small> {{ booking.start_time }}<br>
+                            <small class="text-muted">End:</small> {{ booking.end_time }}
+                        </td>
+                        <td>{{ booking.purpose }}</td>
+                        <td>
+                            {% if booking.status == 'pending' %}
+                                <span class="badge bg-warning text-dark">Pending</span>
+                            {% elif booking.status == 'approved' %}
+                                <span class="badge bg-success">Approved</span>
+                            {% else %}
+                                <span class="badge bg-danger">Rejected</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <div class="text-center py-5">
+                <h5 class="text-muted">Hi {{ session.name }}, you haven't made any bookings yet.</h5>
+                <a href="{{ url_for('faculty_booking') }}" class="btn btn-primary mt-3">Book a Facility Now</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

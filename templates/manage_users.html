@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card shadow">
+    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+        <h4>Manage Accounts</h4>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-dark btn-sm">Back to Menu</a>
+    </div>
+    <div class="card-body">
+        <table class="table table-bordered table-hover" id="usersTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Full Name</th>
+                    <th>Username</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.name }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" 
+                                onclick="openUserModal('{{ user.id }}', '{{ user.name }}', '{{ user.username }}')">
+                                Edit / Reset PW
+                        </button>
+                        <a href="/delete_user/{{ user.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user? This will also delete their bookings.')">Delete</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="userModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="POST" action="{{ url_for('manage_users') }}">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Update User</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="user_id" id="userId">
+        <div class="mb-3">
+            <label>Full Name</label>
+            <input type="text" name="name" id="userName" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label>Username</label>
+            <input type="text" name="username" id="userUser" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="text-danger">Reset Password (Optional)</label>
+            <input type="text" name="password" class="form-control" placeholder="Leave blank to keep current password">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Update User</button>
+      </div>
+    </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openUserModal(id, name, username) {
+        $('#userId').val(id);
+        $('#userName').val(name);
+        $('#userUser').val(username);
+        $('#userModal').modal('show');
+    }
+    
+    $(document).ready(function() {
+        $('#usersTable').DataTable();
+    });
+</script>
+{% endblock %}
