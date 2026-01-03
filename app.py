@@ -6,10 +6,10 @@ import MySQLdb.cursors
 app = Flask(__name__)
 
 # --- CONFIGURATION ---
-app.secret_key = 'facilibook'  # Keep this secret
+app.secret_key = 'facilibook' 
 app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'      # Your MariaDB Username
-app.config['MYSQL_PASSWORD'] = ''      # Your MariaDB Password
+app.config['MYSQL_USER'] = 'root'     
+app.config['MYSQL_PASSWORD'] = ''      
 app.config['MYSQL_DB'] = 'facilibook'
 
 mysql = MySQL(app)
