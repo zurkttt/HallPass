@@ -1,26 +1,48 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session
 from flask_mysqldb import MySQL
 import MySQLdb.cursors
+
 
 app = Flask(__name__)
 
 # --- CONFIGURATION ---
-app.secret_key = 'your_secret_key'  # Change to a random secret word
+app.secret_key = 'facilibook'  # Keep this secret
 app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'      # Your MariaDB username
-app.config['MYSQL_PASSWORD'] = ''      # Your MariaDB password
-app.config['MYSQL_DB'] = 'booking_system'
+app.config['MYSQL_USER'] = 'root'      # Your MariaDB Username
+app.config['MYSQL_PASSWORD'] = ''      # Your MariaDB Password
+app.config['MYSQL_DB'] = 'facilibook'
 
 mysql = MySQL(app)
 
-# --- HELPER FUNCTIONS (Must be defined BEFORE routes use them) ---
+# --- HELPER FUNCTIONS ---
+
 def get_facilities():
-    """Helper function to fetch all facilities for dropdowns."""
+    """Fetches list of all facilities."""
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     cursor.execute('SELECT * FROM facilities')
     return cursor.fetchall()
 
-# --- AUTH ROUTES ---
+def get_user_bookings(user_id):
+    """Fetches booking history for a specific user, INCLUDING the approver's name."""
+    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    # We join 'users' table TWICE: 
+    # 1. To get the Faculty Name (u.name)
+    # 2. To get the Admin Approver's Name (admin_user.name)
+    query = """
+        SELECT 
+            b.id, b.start_time, b.end_time, b.purpose, b.status, 
+            f.name as facility_name,
+            admin_user.name as approver_name
+        FROM bookings b
+        JOIN facilities f ON b.facility_id = f.id
+        LEFT JOIN users admin_user ON b.approved_by = admin_user.id
+        WHERE b.user_id = %s
+        ORDER BY b.start_time DESC
+    """
+    cursor.execute(query, (user_id,))
+    return cursor.fetchall()
+
+# --- AUTHENTICATION ROUTES ---
 
 @app.route('/')
 def index():
@@ -36,18 +58,18 @@ def login():
         cursor.execute('SELECT * FROM users WHERE username = %s', (username,))
         account = cursor.fetchone()
         
-        # Simple Password Check
+        # Simple plain-text password check (as requested)
         if account and account['password'] == password:
             session['loggedin'] = True
             session['id'] = account['id']
             session['username'] = account['username']
             session['role'] = account['role']
-            session['name'] = account.get('name', username)
+            session['name'] = account['name']
             
             if account['role'] == 'admin':
                 return redirect(url_for('admin_dashboard'))
             else:
-                return redirect(url_for('faculty_booking'))
+                return redirect(url_for('my_bookings'))
         else:
             return render_template('login.html', error="Incorrect Username or Password")
             
@@ -55,6 +77,7 @@ def login():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    """Allows new Instructors to create an account."""
     if request.method == 'POST':
         name = request.form['name']
         username = request.form['username']
@@ -64,12 +87,10 @@ def register():
         
         # Check if username exists
         cursor.execute('SELECT * FROM users WHERE username = %s', (username,))
-        account = cursor.fetchone()
-        
-        if account:
+        if cursor.fetchone():
             return render_template('register.html', error="Username already exists!")
         
-        # Insert new Faculty
+        # Create new Faculty User
         cursor.execute('INSERT INTO users (name, username, password, role) VALUES (%s, %s, %s, "faculty")', 
                        (name, username, password))
         mysql.connection.commit()
@@ -91,24 +112,23 @@ def admin_dashboard():
         return render_template('admin_dashboard.html')
     return redirect(url_for('login'))
 
-# 1. MANAGE FACILITIES PAGE
+# Feature: CRUD Facilities
 @app.route('/admin/facilities', methods=['GET', 'POST'])
 def manage_facilities():
     if 'role' in session and session['role'] == 'admin':
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # Handle Add Facility
         if request.method == 'POST':
-            # Check if this is an Edit or Add (Hidden ID field)
+            # Check if this is an Edit (has ID) or New (no ID)
             if 'facility_id' in request.form and request.form['facility_id']:
-                # UPDATE LOGIC
+                # Update
                 fid = request.form['facility_id']
                 name = request.form['name']
                 desc = request.form['description']
                 cap = request.form['capacity']
                 cursor.execute('UPDATE facilities SET name=%s, description=%s, capacity=%s WHERE id=%s', (name, desc, cap, fid))
             else:
-                # INSERT LOGIC
+                # Insert
                 name = request.form['name']
                 desc = request.form['description']
                 cap = request.form['capacity']
@@ -117,7 +137,6 @@ def manage_facilities():
             mysql.connection.commit()
             return redirect(url_for('manage_facilities'))
 
-        # List all
         facilities = get_facilities()
         return render_template('manage_facilities.html', facilities=facilities)
     return redirect(url_for('login'))
@@ -130,7 +149,7 @@ def delete_facility(id):
         mysql.connection.commit()
     return redirect(url_for('manage_facilities'))
 
-# 2. BOOKING APPROVALS PAGE
+# Feature: Booking Approvals
 @app.route('/admin/bookings')
 def admin_bookings():
     if 'role' in session and session['role'] == 'admin':
@@ -141,22 +160,22 @@ def admin_bookings():
             FROM bookings b
             JOIN facilities f ON b.facility_id = f.id
             JOIN users u ON b.user_id = u.id
-            ORDER BY b.start_time DESC
+            WHERE b.status = 'pending'
+            ORDER BY b.start_time ASC
         """
         cursor.execute(query)
         bookings = cursor.fetchall()
         return render_template('admin_bookings.html', bookings=bookings)
     return redirect(url_for('login'))
 
-# --- MISSING APPROVAL ROUTES ---
-
 @app.route('/approve_booking/<int:id>')
 def approve_booking(id):
     if 'role' in session and session['role'] == 'admin':
+        admin_id = session['id'] # Capture who clicked the button
         cursor = mysql.connection.cursor()
-        cursor.execute("UPDATE bookings SET status = 'approved' WHERE id = %s", (id,))
+        # Set status to Approved AND save the Admin's ID
+        cursor.execute("UPDATE bookings SET status = 'approved', approved_by = %s WHERE id = %s", (admin_id, id))
         mysql.connection.commit()
-        # Redirect back to the bookings list
         return redirect(url_for('admin_bookings'))
     return redirect(url_for('login'))
 
@@ -166,25 +185,22 @@ def reject_booking(id):
         cursor = mysql.connection.cursor()
         cursor.execute("UPDATE bookings SET status = 'rejected' WHERE id = %s", (id,))
         mysql.connection.commit()
-        # Redirect back to the bookings list
         return redirect(url_for('admin_bookings'))
     return redirect(url_for('login'))
 
-
-# 3. MANAGE USERS PAGE
+# Feature: CRUD Users
 @app.route('/admin/users', methods=['GET', 'POST'])
 def manage_users():
     if 'role' in session and session['role'] == 'admin':
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # Handle User Update
         if request.method == 'POST':
             user_id = request.form['user_id']
             name = request.form['name']
             username = request.form['username']
-            # Optional: Password reset if field is not empty
             password = request.form['password']
             
+            # Update password only if provided
             if password:
                 cursor.execute('UPDATE users SET name=%s, username=%s, password=%s WHERE id=%s', (name, username, password, user_id))
             else:
@@ -193,7 +209,7 @@ def manage_users():
             mysql.connection.commit()
             return redirect(url_for('manage_users'))
 
-        # Fetch all users (excluding admin usually, or show all)
+        # Show all users except admins
         cursor.execute("SELECT * FROM users WHERE role != 'admin'")
         users = cursor.fetchall()
         return render_template('manage_users.html', users=users)
@@ -207,13 +223,42 @@ def delete_user(id):
         mysql.connection.commit()
     return redirect(url_for('manage_users'))
 
-# --- FACULTY BOOKING (FORM ONLY) ---
+# Feature: Reports
+@app.route('/admin/reports')
+def admin_reports():
+    if 'role' in session and session['role'] == 'admin':
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        # Fetch Approved Bookings History
+        query = """
+            SELECT b.start_time, b.end_time, b.purpose, f.name AS facility_name, u.name AS faculty_name
+            FROM bookings b
+            JOIN facilities f ON b.facility_id = f.id
+            JOIN users u ON b.user_id = u.id
+            WHERE b.status = 'approved'
+            ORDER BY b.start_time DESC
+        """
+        cursor.execute(query)
+        reports = cursor.fetchall()
+        return render_template('admin_reports.html', reports=reports)
+    return redirect(url_for('login'))
+
+# --- FACULTY ROUTES ---
+
+@app.route('/my_bookings')
+def my_bookings():
+    """Faculty Dashboard: Shows History & Print Permit Button."""
+    if 'role' in session and session['role'] == 'faculty':
+        user_id = session['id']
+        bookings = get_user_bookings(user_id)
+        return render_template('my_bookings.html', bookings=bookings)
+    return redirect(url_for('login'))
+
 @app.route('/faculty', methods=['GET', 'POST'])
 def faculty_booking():
+    """Transaction: Booking Form with Conflict Check."""
     if 'role' in session and session['role'] == 'faculty':
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         
-        # --- HANDLE BOOKING SUBMISSION ---
         if request.method == 'POST':
             facility_id = request.form['facility_id']
             start_str = request.form['start_time']
@@ -221,13 +266,14 @@ def faculty_booking():
             purpose = request.form['purpose']
             user_id = session['id']
             
-            # Validation: End time after Start time
+            # 1. Validation: End time must be after Start time
             if start_str >= end_str:
                 return render_template('faculty_booking.html', 
                                      facilities=get_facilities(), 
                                      error="End time must be after Start time.")
 
-            # CONFLICT CHECK
+            # 2. Conflict Detection Logic
+            # Check if any APPROVED/PENDING booking overlaps with requested time
             query = """
                 SELECT * FROM bookings 
                 WHERE facility_id = %s 
@@ -243,48 +289,40 @@ def faculty_booking():
                                      facilities=get_facilities(), 
                                      error=f"Conflict! Facility is busy from {conflict['start_time']} to {conflict['end_time']}")
             else:
+                # No conflict? Insert the request.
                 cursor.execute('INSERT INTO bookings (facility_id, user_id, start_time, end_time, purpose) VALUES (%s, %s, %s, %s, %s)', 
                                (facility_id, user_id, start_str, end_str, purpose))
                 mysql.connection.commit()
-                # SUCCESS: Redirect to the Dashboard/History page
                 return redirect(url_for('my_bookings'))
 
-        # --- LOAD PAGE (GET) ---
-        # Only fetch facilities, no history needed here
-        facilities = get_facilities()
-        return render_template('faculty_booking.html', facilities=facilities)
+        return render_template('faculty_booking.html', facilities=get_facilities())
     return redirect(url_for('login'))
 
-# Helper function to get history (Cleaner code)
-def get_user_bookings(user_id):
-    cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    query = """
-        SELECT b.start_time, b.end_time, b.purpose, b.status, f.name as facility_name
-        FROM bookings b
-        JOIN facilities f ON b.facility_id = f.id
-        WHERE b.user_id = %s
-        ORDER BY b.start_time DESC
-    """
-    cursor.execute(query, (user_id,))
-    return cursor.fetchall()
-
-@app.route('/my_bookings')
-def my_bookings():
-    if 'role' in session and session['role'] == 'faculty':
+# Feature: Print Permit Page
+@app.route('/print_permit/<int:id>')
+def print_permit(id):
+    """Generates the printable permit for an approved booking."""
+    if 'role' in session: # Allow Admin or Faculty to see this
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        user_id = session['id']
-        
         query = """
-            SELECT b.start_time, b.end_time, b.purpose, b.status, f.name as facility_name
+            SELECT 
+                b.id, b.start_time, b.end_time, b.purpose, 
+                f.name as facility_name,
+                u.name as faculty_name,
+                admin_user.name as approver_name
             FROM bookings b
             JOIN facilities f ON b.facility_id = f.id
-            WHERE b.user_id = %s
-            ORDER BY b.start_time DESC
+            JOIN users u ON b.user_id = u.id
+            LEFT JOIN users admin_user ON b.approved_by = admin_user.id
+            WHERE b.id = %s AND b.status = 'approved'
         """
-        cursor.execute(query, (user_id,))
-        bookings = cursor.fetchall()
-        return render_template('my_bookings.html', bookings=bookings)
-    return redirect(url_for('login'))
+        cursor.execute(query, (id,))
+        booking = cursor.fetchone()
+        
+        if booking:
+            return render_template('print_permit.html', booking=booking)
+            
+    return "Permit not found or not approved."
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 28, 2025 at 12:40 PM
+-- Generation Time: Jan 03, 2026 at 12:43 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -18,7 +18,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `booking_system`
+-- Database: `facilibook`
 --
 
 -- --------------------------------------------------------
@@ -34,15 +34,19 @@ CREATE TABLE `bookings` (
   `start_time` datetime NOT NULL,
   `end_time` datetime NOT NULL,
   `purpose` varchar(255) DEFAULT NULL,
-  `status` enum('pending','approved','rejected') DEFAULT 'pending'
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `approved_by` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `bookings`
 --
 
-INSERT INTO `bookings` (`id`, `facility_id`, `user_id`, `start_time`, `end_time`, `purpose`, `status`) VALUES
-(1, 1, 2, '2025-12-28 08:30:00', '2025-12-28 12:00:00', 'Activity', 'approved');
+INSERT INTO `bookings` (`id`, `facility_id`, `user_id`, `start_time`, `end_time`, `purpose`, `status`, `approved_by`) VALUES
+(1, 1, 2, '2026-01-05 07:20:00', '2026-01-05 10:20:00', 'Test1', 'approved', NULL),
+(2, 2, 2, '2026-01-06 07:20:00', '2026-01-06 12:00:00', 'Test2', 'rejected', NULL),
+(3, 1, 2, '2026-01-12 07:40:00', '2026-01-12 10:40:00', 'Test3', 'approved', 1),
+(4, 2, 3, '2026-01-07 08:40:00', '2026-01-07 12:00:00', 'Test4', 'approved', 1);
 
 -- --------------------------------------------------------
 
@@ -62,8 +66,8 @@ CREATE TABLE `facilities` (
 --
 
 INSERT INTO `facilities` (`id`, `name`, `description`, `capacity`) VALUES
-(1, 'Amphitheater', 'Sample', 120),
-(2, 'SAC ', 'sample2', 60);
+(1, 'Amphitheater', 'For big events', 450),
+(2, 'SAC', 'For Performance Task', 120);
 
 -- --------------------------------------------------------
 
@@ -73,7 +77,7 @@ INSERT INTO `facilities` (`id`, `name`, `description`, `capacity`) VALUES
 
 CREATE TABLE `users` (
   `id` int(11) NOT NULL,
-  `name` varchar(100) DEFAULT NULL,
+  `name` varchar(100) NOT NULL,
   `username` varchar(50) NOT NULL,
   `password` varchar(255) NOT NULL,
   `role` enum('admin','faculty') NOT NULL
@@ -84,9 +88,9 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`) VALUES
-(1, 'Admin', 'admin', 'admin123', 'admin'),
-(2, 'Test', 'faculty', 'faculty123', 'faculty'),
-(3, 'Earl Naniong', 'Early', '1234', 'faculty');
+(1, 'System Admin', 'admin', 'admin', 'admin'),
+(2, 'Dill Doe', 'test', 'test', 'faculty'),
+(3, 'Test2', 'Test2', 'test2', 'faculty');
 
 --
 -- Indexes for dumped tables
@@ -98,7 +102,8 @@ INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`) VALUES
 ALTER TABLE `bookings`
   ADD PRIMARY KEY (`id`),
   ADD KEY `facility_id` (`facility_id`),
-  ADD KEY `user_id` (`user_id`);
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `fk_approver` (`approved_by`);
 
 --
 -- Indexes for table `facilities`
@@ -110,7 +115,8 @@ ALTER TABLE `facilities`
 -- Indexes for table `users`
 --
 ALTER TABLE `users`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `username` (`username`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -120,7 +126,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `bookings`
 --
 ALTER TABLE `bookings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `facilities`
@@ -143,7 +149,8 @@ ALTER TABLE `users`
 --
 ALTER TABLE `bookings`
   ADD CONSTRAINT `bookings_ibfk_1` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `bookings_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `bookings_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_approver` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
